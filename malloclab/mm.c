@@ -24,15 +24,15 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "csoteam",
+    "NYU Shanghai #1",
     /* First member's full name */
-    "Jinyang Li",
+    "Kelvin Liu",
     /* First member's email address */
-    "jl123@nyu.edu",
+    "kelvin.liu@nyu.edu",
     /* Second member's full name (leave blank if none) */
-    "",
+    "Xiangci Li",
     /* Second member's email address (leave blank if none) */
-    ""
+    "xl1066@nyu.edu"
 };
 
 /* 
