@@ -8,6 +8,9 @@
  *
  * NOTE TO STUDENTS: Replace this header comment with your own header
  * comment that gives a high level description of your solution.
+ *
+ * Explicit free list
+ * Pointers, headers, and footers are 64 bits = 8 bytes = double words
  */
 
 #include <stdio.h>
@@ -37,9 +40,9 @@ team_t team = {
 };
 
 /* Size constants (in bytes) */
-#define WORD 4
-#define DWORD 8
-#define QWORD 16
+#define WORD 8
+#define DWORD 16
+#define MIN_BLOCK_SIZE 32
 
 /* Default size for extending heap */
 #define CHUNKSIZE (1 << 12)
@@ -51,8 +54,8 @@ team_t team = {
 #define PACK(size, alloc) ((size) | (alloc))
 
 /* Read and write a word at address p */
-#define GET(p) (*(unsigned int *)(p))
-#define PUT(p, val) (*(unsigned int *)(p) = (val))
+#define GET(p) (*(unsigned long *)(p))
+#define PUT(p, val) (*(unsigned long *)(p) = (val))
 
 /* Read the size and allocated fields from address p */
 #define GET_SIZE(p) (GET(p) & ~0x0F)
@@ -67,35 +70,38 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DWORD)))
 
 /* Private global variables - integers, floats, and pointers only */
-static void *heap_listp;
+static char *heap_start;
+static char *flist_head;
 
-/* Explicit function declarations */
+/* Interface function prototypes */
 int mm_init(void);
-static void* extend_heap(size_t words);
-static void *coalesce(void *bp);
-void mm_free(void *ptr);
 void *mm_malloc(size_t size);
-static void *find_fit(size_t size);
-static void place(void *bp, size_t size);
+void mm_free(void *ptr);
 void *mm_realloc(void *ptr, size_t size);
 void mm_checkheap(int verbose);
 
+/* Helper function prototypes */
+static void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+static void *find_fit(size_t size);
+static void place(void *bp, size_t size);
+
 int mm_init(void) {
     //create initial empty heap
-    heap_listp = mem_sbrk(4*WORD);
-    if (heap_listp == (void *)-1)
+    heap_start = (char *)mem_sbrk(MIN_BLOCK_SIZE);
+    if (heap_start == (void *)-1)
         return -1;
-    PUT(heap_listp, 0);
+    //alignment padding
+    PUT(heap_start, 0);
     //prologue header
-    PUT(heap_listp + 1*WORD, PACK(DWORD, 1));
+    PUT(heap_start + 1*WORD, PACK(DWORD, 1));
     //prologue footer
-    PUT(heap_listp + 2*WORD, PACK(DWORD, 1));
+    PUT(heap_start + 2*WORD, PACK(DWORD, 1));
     //epilogue header
-    PUT(heap_listp + 3*WORD, PACK(0, 1));
-    //set heap_listp to the prologue
-    heap_listp += 2*WORD;
-
-    //extend this heap
+    PUT(heap_start + 3*WORD, PACK(0, 1));
+    //set heap_start to the prologue
+    heap_start += 2*WORD;
+    //get free space for the heap
     if (extend_heap(CHUNKSIZE/WORD) == NULL)
         return -1;
     return 0;
@@ -193,7 +199,7 @@ void *mm_malloc(size_t size) {
 
 static void *find_fit(size_t size) {
     //iterate over blocks until a free block with enough size is found
-    for (void *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+    for (void *bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
         if (!GET_ALLOC(HDRP(bp)) && size <= GET_SIZE(HDRP(bp)))
             return bp;
     //no blocks fit, return NULL
@@ -218,7 +224,40 @@ static void place(void *bp, size_t size) {
 }
 
 void *mm_realloc(void *ptr, size_t size) {
-    return ptr;
+    //realloc is equivalent to malloc if ptr is NULL
+    if (ptr == NULL)
+        return mm_malloc(size);
+    //realloc is equivalent to free if size is 0
+    if (size <= 0) {
+        mm_free(ptr);
+        return NULL;
+    }
+    //ensure size is aligned
+    size_t adj_size = MAX(ALIGN(size) + DWORD, MIN_BLOCK_SIZE);
+    size_t block_size = GET_SIZE(HDRP(ptr));
+    //currently allocated space doesn't need to grow
+    if (adj_size <= block_size) {
+        //split if difference is larger than the minimum block size
+        if (block_size - adj_size > MIN_BLOCK_SIZE) {
+            PUT(HDRP(ptr), PACK(adj_size, 1));
+            PUT(FTRP(ptr), PACK(adj_size, 1));
+            PUT(HDRP(NEXT_BLKP(ptr)), PACK(block_size - adj_size, 1));
+            mm_free(NEXT_BLKP(ptr));
+        }
+        return ptr;
+    }
+    //more space needed
+    else {
+        void *new_ptr = mm_malloc(size);
+        //malloc fails, so realloc also fails
+        if (new_ptr == NULL)
+            return NULL;
+        //copy old data
+        memcpy(new_ptr, ptr, block_size);
+        //free ptr
+        mm_free(ptr);
+        return new_ptr;
+    }
 }
 
 void mm_checkheap(int verbose) {
