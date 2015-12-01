@@ -153,7 +153,6 @@ static void *coalesce(void *bp) {
     return bp;
 }
 
-<<<<<<< HEAD
 void mm_free(void *ptr) {
     //get size of block
     size_t size = GET_SIZE(HDRP(ptr));
@@ -187,65 +186,6 @@ void *mm_malloc(size_t size) {
             place(bp, adj_size);
     }
     return bp;
-=======
-/*
- * mm_free - Freeing a block does nothing.
- */
-void mm_free(void *ptr)
-{
-	size_t sizce = GET_SIZE(HDRP(ptr));
-	PUT(HDRP(ptr),PACK(size,0));
-	PUT(FTRP(ptr),PACK(size,0));
-	coalesce(ptr);
-}
-
-static void *coalesce(void *bp){
-	size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-	size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-	size_t size = GET_SIZE(HDRP(bp));
-
-	if(prev_alloc&&next_alloc){
-		return bp;
-	}
-	else if (prev_alloc && !next_alloc){
-		size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-		PUT(HDRP(bp), PACK(size, 0));
-		PUT(FTRP(bp), PACK(size, 0));
-	}
-	else if (!prev_alloc && next_alloc){
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-		bp = PREV_blkp(bp);
-    }
-	else{
-		size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));
-		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-		bp = PREV_BLKP(bp);
-	}
-	return bp;
-}
-
-/*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- */
-void *mm_realloc(void *ptr, size_t size)
-{
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
->>>>>>> 7a8cc62c203314d744562d45d6b572b6339e8d03
 }
 
 static void *find_fit(size_t size) {
