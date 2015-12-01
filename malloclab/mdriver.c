@@ -152,6 +152,9 @@ int main(int argc, char **argv)
     double secs, ops, util, avg_mm_util, avg_mm_throughput, p1, p2, perfindex;
     double libc_secs, libc_ops, avg_libc_throughput;
     int numcorrect;
+
+    /* if we are using default traces are not (those do not get malloced) */
+    int using_default_traces = 0;
     
     /* 
      * Read and interpret the command line arguments 
@@ -225,6 +228,7 @@ int main(int argc, char **argv)
      * defined in default_traces[]
      */
     if (tracefiles == NULL) {
+        using_default_traces = 1;
         tracefiles = default_tracefiles;
         num_tracefiles = sizeof(default_tracefiles) / sizeof(char *) - 1;
 	printf("Using default tracefiles in %s\n", tracedir);
@@ -356,6 +360,24 @@ int main(int argc, char **argv)
 	printf("correct:%d\n", numcorrect);
 	printf("perfidx:%.0f\n", perfindex);
     }
+
+    // clear up allocated memory used in the program
+    if (using_default_traces == 0)
+    {
+        // non-default traces are malloced
+        for (i = 0; i < num_tracefiles; i++)
+        {
+            if (tracefiles[i] != NULL)
+            {
+                free(tracefiles[i]);
+            }
+        }
+        free(tracefiles);
+    }
+    free(libc_stats);
+    free(mm_stats);
+    mem_deinit();
+    clear_ranges(&ranges);
 
     exit(0);
 }
