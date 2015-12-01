@@ -40,6 +40,7 @@ team_t team = {
 #define WORD 4
 #define DWORD 8
 #define QWORD 16
+#define MIN_BLOCK_SIZE 32
 
 /* Default size for extending heap */
 #define CHUNKSIZE (1 << 12)
@@ -51,23 +52,24 @@ team_t team = {
 #define PACK(size, alloc) ((size) | (alloc))
 
 /* Read and write a word at address p */
-#define GET(p) (*(unsigned int *)(p))
-#define PUT(p, val) (*(unsigned int *)(p) = (val))
+#define GET(p) (*(unsigned long *)(p))
+#define PUT(p, val) (*(unsigned long *)(p) = (val))
 
 /* Read the size and allocated fields from address p */
 #define GET_SIZE(p) (GET(p) & ~0x0F)
 #define GET_ALLOC(p) (GET(p) & 0x01)
 
 /* Given block ptr bp, compute address of its header and footer */
-#define HDRP(bp) ((char *)(bp) - WORD)
-#define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DWORD)
+#define HDRP(bp) ((char *)(bp) - DWORD)
+#define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - QWORD)
 
 /* Given block ptr bp, compute address of next and previous blocks */
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WORD)))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DWORD)))
 
 /* Private global variables - integers, floats, and pointers only */
-static void *heap_listp;
+static char *heap_start;
+static char *flist_head;
 
 /* Explicit function declarations */
 int mm_init(void);
@@ -82,18 +84,19 @@ void mm_checkheap(int verbose);
 
 int mm_init(void) {
     //create initial empty heap
-    heap_listp = mem_sbrk(4*WORD);
-    if (heap_listp == (void *)-1)
+    heap_start = mem_sbrk(QWORD);
+    if (heap_start == (void *)-1)
         return -1;
-    PUT(heap_listp, 0);
+    //alignment padding
+    PUT(heap_start, 0);
     //prologue header
-    PUT(heap_listp + 1*WORD, PACK(DWORD, 1));
+    PUT(heap_start + 1*WORD, PACK(DWORD, 1));
     //prologue footer
-    PUT(heap_listp + 2*WORD, PACK(DWORD, 1));
+    PUT(heap_start + 2*WORD, PACK(DWORD, 1));
     //epilogue header
-    PUT(heap_listp + 3*WORD, PACK(0, 1));
-    //set heap_listp to the prologue
-    heap_listp += 2*WORD;
+    PUT(heap_start + 3*WORD, PACK(0, 1));
+    //set heap_start to the prologue
+    heap_start += 2*WORD;
 
     //extend this heap
     if (extend_heap(CHUNKSIZE/WORD) == NULL)
@@ -193,7 +196,7 @@ void *mm_malloc(size_t size) {
 
 static void *find_fit(size_t size) {
     //iterate over blocks until a free block with enough size is found
-    for (void *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+    for (void *bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
         if (!GET_ALLOC(HDRP(bp)) && size <= GET_SIZE(HDRP(bp)))
             return bp;
     //no blocks fit, return NULL
