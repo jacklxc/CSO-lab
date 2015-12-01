@@ -36,10 +36,13 @@ team_t team = {
     "xl1066@nyu.edu"
 };
 
-/* Basic constants and macros */
-#define WSIZE 4 //Word and header/footer size (bytes)
-#define DSIZE 8 //Double word size (bytes)
-#define CHUNKSIZE (1<<12) //Extend heap by this amount (bytes)
+/* Size constants (in bytes) */
+#define WORD 4
+#define DWORD 8
+#define QWORD 16
+
+/* Default size for extending heap */
+#define CHUNKSIZE (1 << 12)
 
 /* Returns the larger of two values */
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
@@ -52,16 +55,16 @@ team_t team = {
 #define PUT(p, val) (*(unsigned int *)(p) = (val))
 
 /* Read the size and allocated fields from address p */
-#define GET_SIZE(p) (GET(p) & ~0x07)
+#define GET_SIZE(p) (GET(p) & ~0x0F)
 #define GET_ALLOC(p) (GET(p) & 0x01)
 
 /* Given block ptr bp, compute address of its header and footer */
-#define HDRP(bp) ((char *)(bp) - WSIZE)
-#define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+#define HDRP(bp) ((char *)(bp) - WORD)
+#define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DWORD)
 
 /* Given block ptr bp, compute address of next and previous blocks */
-#define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
-#define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+#define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WORD)))
+#define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DWORD)))
 
 /* Private global variables - integers, floats, and pointers only */
 static void *heap_listp;
@@ -79,28 +82,28 @@ void mm_checkheap(int verbose);
 
 int mm_init(void) {
     //create initial empty heap
-    heap_listp = mem_sbrk(4*WSIZE);
+    heap_listp = mem_sbrk(4*WORD);
     if (heap_listp == (void *)-1)
         return -1;
     PUT(heap_listp, 0);
     //prologue header
-    PUT(heap_listp + 1*WSIZE, PACK(DSIZE, 1));
+    PUT(heap_listp + 1*WORD, PACK(DWORD, 1));
     //prologue footer
-    PUT(heap_listp + 2*WSIZE, PACK(DSIZE, 1));
+    PUT(heap_listp + 2*WORD, PACK(DWORD, 1));
     //epilogue header
-    PUT(heap_listp + 3*WSIZE, PACK(0, 1));
+    PUT(heap_listp + 3*WORD, PACK(0, 1));
     //set heap_listp to the prologue
-    heap_listp += 2*WSIZE;
+    heap_listp += 2*WORD;
 
     //extend this heap
-    if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
+    if (extend_heap(CHUNKSIZE/WORD) == NULL)
         return -1;
     return 0;
 }
 
 static void *extend_heap(size_t words) {
     //ensure number of words for the new block is even
-    size_t size = (words % 2 == 0) ? words*WSIZE : (words + 1)*WSIZE;
+    size_t size = (words % 2 == 0) ? words*WORD : (words + 1)*WORD;
     //pointer to the new block
     void *bp = mem_sbrk(size);
     if (bp == (void *)-1)
@@ -169,10 +172,10 @@ void *mm_malloc(size_t size) {
         return NULL;
     //adjust given size
     size_t adj_size;
-    if (size <= DSIZE)
-        adj_size = 2*DSIZE;
+    if (size <= DWORD)
+        adj_size = 2*DWORD;
     else
-        adj_size = DSIZE*((size + DSIZE + DSIZE - 1)/DSIZE);
+        adj_size = DWORD*((size + DWORD + DWORD - 1)/DWORD);
     //find sufficiently-sized free block
     void *bp = find_fit(adj_size);
     //if a suitable block is found, place it there
@@ -181,7 +184,7 @@ void *mm_malloc(size_t size) {
     //otherwise, extend the heap and then place
     else {
         size_t extend_size = MAX(adj_size, CHUNKSIZE);
-        bp = extend_heap(extend_size/WSIZE);
+        bp = extend_heap(extend_size/WORD);
         if (bp != NULL)
             place(bp, adj_size);
     }
@@ -200,7 +203,7 @@ static void *find_fit(size_t size) {
 static void place(void *bp, size_t size) {
     size_t block_size = GET_SIZE(HDRP(bp));
     //if there is excess space in the current block, split the block
-    if (block_size - size >= 2*DSIZE) {
+    if (block_size - size >= 2*DWORD) {
         PUT(HDRP(bp), PACK(size, 1));
         PUT(FTRP(bp), PACK(size, 1));
         bp = NEXT_BLKP(bp);
