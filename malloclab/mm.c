@@ -96,19 +96,23 @@ static void remove_block(void *bp);
 
 int mm_init(void) {
     //create initial empty heap
-    heap_start = (char *)mem_sbrk(MIN_BLOCK_SIZE);
+    heap_start = (char *)mem_sbrk(3*DWORD);
     if (heap_start == (void *)-1)
         return -1;
     //alignment padding
     PUT(heap_start, 0);
     //prologue header
     PUT(heap_start + 1*WORD, PACK(DWORD, 1));
+    //prologue previous pointer
+    PUT(heap_start + 2*WORD, 0);
+    //prologue next pointer
+    PUT(heap_start + 3*WORD, 0);
     //prologue footer
-    PUT(heap_start + 2*WORD, PACK(DWORD, 1));
+    PUT(heap_start + 4*WORD, PACK(DWORD, 1));
     //epilogue header
-    PUT(heap_start + 3*WORD, PACK(0, 1));
-    //set heap_start to the prologue
-    heap_start += 2*WORD;
+    PUT(heap_start + 5*WORD, PACK(0, 1));
+    //set flist_head to the prologue
+    flist_head += 2*WORD;
     //get free space for the heap
     if (extend_heap(CHUNKSIZE/WORD) == NULL)
         return -1;
@@ -213,7 +217,7 @@ void *mm_malloc(size_t size) {
 
 static void *find_fit(size_t size) {
     //iterate over free list until a block with enough size is found
-    for (void *bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_FREE(bp))
+    for (void *bp = flist_head; 1; bp = NEXT_FREE(bp))
         if (size <= GET_SIZE(HDRP(bp)))
             return bp;
     //no blocks fit, return NULL
