@@ -74,8 +74,8 @@ team_t team = {
 #define NEXT_FREE(bp) (*(void **)((char *)(bp) + WORD))
 
 /* Private global variables - integers, floats, and pointers only */
-static char *heap_start;
-static char *flist_head;
+static void *heap_start;
+static void *flist_head;
 
 /* Interface function prototypes */
 int mm_init(void);
