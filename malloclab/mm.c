@@ -69,6 +69,10 @@ team_t team = {
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WORD)))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DWORD)))
 
+/* Given block ptr bp, get pointer to next and previous free blocks */
+#define NEXT_FREE(bp) (*(void **)((bp) + WORD))
+#define PREV_FREE(bp) (*(void **)(bp))
+
 /* Private global variables - integers, floats, and pointers only */
 static char *heap_start;
 static char *flist_head;
@@ -85,6 +89,10 @@ static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t size);
+
+/* Free list function prototypes */
+static void insert_to_flist(void *bp);
+static void remove_block(void *bp);
 
 int mm_init(void) {
     //create initial empty heap
@@ -108,8 +116,10 @@ int mm_init(void) {
 }
 
 static void *extend_heap(size_t words) {
-    //ensure number of words for the new block is even
+    //ensure number of words for the new block is even and meets minimum size
     size_t size = (words % 2 == 0) ? words*WORD : (words + 1)*WORD;
+    if (size < MIN_BLOCK_SIZE)
+        size = MIN_BLOCK_SIZE;
     //pointer to the new block
     void *bp = mem_sbrk(size);
     if (bp == (void *)-1)
@@ -128,13 +138,12 @@ static void *coalesce(void *bp) {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
-    //both previous and next blocks are allocated
-    if (prev_alloc && next_alloc)
-        return bp;
     //previous block is allocated and next block is free
-    else if (prev_alloc && !next_alloc) {
+    if (prev_alloc && !next_alloc) {
         //increment by the size of the next block
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        //remove the next block from the free list
+        remove_block(NEXT_BLKP(bp));
         //fix header and footer
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
@@ -143,22 +152,31 @@ static void *coalesce(void *bp) {
     else if (!prev_alloc && next_alloc) {
         //increment by the size of the previous block
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        //fix header and footer
-        PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        //set bp to previous block
+        //remove this block from the free list
+        remove_block(PREV_BLKP(bp));
+        //set bp to previous block because the previous block becomes this block
         bp = PREV_BLKP(bp);
+        //fix header and footer
+        PUT(HDRP(bp), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
     }
     //both previous and next blocks are free
-    else {
+    else if (!prev_alloc && !next_alloc) {
         //increment by the sizes of the previous and next blocks
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        //remove previous and next blocks from the free list
+        remove_block(PREV_BLKP(bp));
+        remove_block(NEXT_BLKP(bp));
+        //set bp to previous block because the previous block becomes this block
+        bp = PREV_BLKP(bp);
         //fix header and footer
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-        //set bp to previous block
-        bp = PREV_BLKP(bp);
     }
+    //both previous and next blocks are allocated; don't do anything special
+    else {}
+    //insert block into free list
+    insert_to_flist(bp);
     return bp;
 }
 
@@ -173,15 +191,11 @@ void mm_free(void *ptr) {
 }
 
 void *mm_malloc(size_t size) {
-    //decline bad input
-    if (size == 0)
+    //decline bad parameters
+    if (size <= 0)
         return NULL;
-    //adjust given size
-    size_t adj_size;
-    if (size <= DWORD)
-        adj_size = 2*DWORD;
-    else
-        adj_size = DWORD*((size + DWORD + DWORD - 1)/DWORD);
+    //ensure size is aligned
+    size_t adj_size = MAX(ALIGN(size) + DWORD, MIN_BLOCK_SIZE);
     //find sufficiently-sized free block
     void *bp = find_fit(adj_size);
     //if a suitable block is found, place it there
@@ -198,9 +212,9 @@ void *mm_malloc(size_t size) {
 }
 
 static void *find_fit(size_t size) {
-    //iterate over blocks until a free block with enough size is found
-    for (void *bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
-        if (!GET_ALLOC(HDRP(bp)) && size <= GET_SIZE(HDRP(bp)))
+    //iterate over free list until a block with enough size is found
+    for (void *bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_FREE(bp))
+        if (size <= GET_SIZE(HDRP(bp)))
             return bp;
     //no blocks fit, return NULL
     return NULL;
@@ -208,18 +222,23 @@ static void *find_fit(size_t size) {
 
 static void place(void *bp, size_t size) {
     size_t block_size = GET_SIZE(HDRP(bp));
-    //if there is excess space in the current block, split the block
-    if (block_size - size >= 2*DWORD) {
+    //if there is enough space in the current block for a new one, split it
+    if (block_size - size >= MIN_BLOCK_SIZE) {
         PUT(HDRP(bp), PACK(size, 1));
         PUT(FTRP(bp), PACK(size, 1));
+        //remove the block from the free list
+        remove_block(bp);
         bp = NEXT_BLKP(bp);
         PUT(HDRP(bp), PACK(block_size - size, 0));
         PUT(FTRP(bp), PACK(block_size - size, 0));
+        coalesce(bp);
     }
     //otherwise just allocate the whole block
     else {
         PUT(HDRP(bp), PACK(block_size, 1));
         PUT(FTRP(bp), PACK(block_size, 1));
+        //remove the block from the free list
+        remove_block(bp);
     }
 }
 
@@ -262,4 +281,26 @@ void *mm_realloc(void *ptr, size_t size) {
 
 void mm_checkheap(int verbose) {
     return;
+}
+
+static void insert_to_flist(void *bp) {
+    //set the bp's next pointer to the head of the free list
+    NEXT_FREE(bp) = flist_head;
+    //set the head of the free list's previous pointer to bp
+    PREV_FREE(flist_head) = bp;
+    //set bp's previous pointer to NULL
+    PREV_FREE(bp) = NULL;
+    //set bp to the head of the free list
+    flist_head = bp;
+}
+
+static void remove_block(void *bp) {
+    //move the head of the free list to bp's next pointer if bp is the head
+    if (bp == flist_head)
+        flist_head = NEXT_FREE(bp);
+    //otherwise, just skip over bp
+    else
+        NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
+    //fix bp's previous pointer
+    PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
 }
