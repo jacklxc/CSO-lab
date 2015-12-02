@@ -102,20 +102,16 @@ int mm_init(void) {
         return -1;
     //alignment padding
     PUT(heap_start, 0);
-    //prologue header
-    PUT(heap_start + 1*WORD, PACK(MIN_BLOCK_SIZE, 1));
     //set flist_head to the prologue
     flist_head = heap_start + 2*WORD;
-    //prologue previous pointer
+    //set prologue header and footer
+    PUT(HDRP(flist_head), PACK(MIN_BLOCK_SIZE, 1));
+    PUT(FTRP(flist_head), PACK(MIN_BLOCK_SIZE, 1));
+    //set prologue previous and next pointers
     PREV_FREE(flist_head) = NULL;
-    // PUT(heap_start + 2*WORD, 0);
-    //prologue next pointer
-    PREV_FREE(flist_head) = NULL;
-    // PUT(heap_start + 3*WORD, 0);
-    //prologue footer
-    PUT(heap_start + 4*WORD, PACK(MIN_BLOCK_SIZE, 1));
-    //epilogue header
-    PUT(heap_start + 5*WORD, PACK(0, 1));
+    NEXT_FREE(flist_head) = NULL;
+    //set epilogue (header of the block after flist_head)
+    PUT(HDRP(NEXT_BLKP(flist_head)), PACK(0, 1));
     //get free space for the heap
     if (extend_heap(CHUNKSIZE/WORD) == NULL)
         return -1;
