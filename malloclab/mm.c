@@ -71,7 +71,7 @@ team_t team = {
 
 /* Given block ptr bp, get pointer to next and previous free blocks */
 #define PREV_FREE(bp) (*(void **)(bp))
-#define NEXT_FREE(bp) (*(void **)((bp) + WORD))
+#define NEXT_FREE(bp) (*(void **)((char *)(bp) + WORD))
 
 /* Private global variables - integers, floats, and pointers only */
 static char *heap_start;
