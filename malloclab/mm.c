@@ -118,6 +118,7 @@ int mm_init(void) {
     //get free space for the heap
     if (extend_heap(CHUNKSIZE/WORD) == NULL)
         return -1;
+	//mm_checkheap(1);
     return 0;
 }
 
@@ -202,6 +203,7 @@ void mm_free(void *ptr) {
     PUT(FTRP(ptr), PACK(size, 0));
     //coalesce if necessary
     coalesce(ptr);
+	//mm_checkheap(1);
 }
 
 void *mm_malloc(size_t size) {
@@ -282,6 +284,7 @@ void *mm_realloc(void *ptr, size_t size) {
             PUT(HDRP(NEXT_BLKP(ptr)), PACK(block_size - adj_size, 1));
             mm_free(NEXT_BLKP(ptr));
         }
+		//mm_checkheap(1);	
         return ptr;
     }
     //more space needed
@@ -294,6 +297,7 @@ void *mm_realloc(void *ptr, size_t size) {
         memcpy(new_ptr, ptr, block_size);
         //free ptr
         mm_free(ptr);
+		//mm_checkheap(1);
         return new_ptr;
     }
 }
@@ -304,36 +308,21 @@ void mm_checkheap(int verbose) {
 	char *bp=heap_start+4*WORD;
 	while (GET_SIZE(HDRP(bp))!=0){
 		if(!GET_ALLOC(HDRP(bp))){
+			//Check if there is any contiguous free block escaped from coalescing.
 			if(!GET_ALLOC(HDRP(NEXT_BLKP(bp)))){
 				printf("There are contiguous free blocks escaped from coalescing.");
-				//return 0;
+				assert(0);
 			}
+			//Check if either an allocated block is in the free list
+			// or a freed block is not in the free list.
 			if(NEXT_FREE(bp)!=NULL){
 				if(GET_ALLOC(HDRP(NEXT_FREE(bp)))){
 					printf("There is an allocated block pointed by NEXT_FREE.");
-					//return 0;
+					assert(0);
 				}
 			}
 		}
 		bp=NEXT_BLKP(bp);
-	}
-	//obtaining a pointer to a freed block
-	bp=heap_start+4*WORD;
-	while (GET_SIZE(HDRP(bp))!=0){
-		if(!GET_ALLOC(HDRP(bp))){
-			break;
-		}
-		bp=NEXT_BLKP(bp);
-	}
-	//Check if every block in the free list is free.
-	while (!GET_ALLOC(HDRP(bp))){
-		if (PREV_BLKP(bp)!=NULL){
-		bp=NEXT_FREE(bp);
-		}
-	}
-	if (bp!=NULL){
-		printf("There is allocated block in the free list.");
-		//return 0;
 	}
     return ;
 }
