@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall  -Wno-unused-result -std=gnu99 -Og -g
+CFLAGS = -Wall -pg -Wno-unused-result -std=gnu99 -Og -g
 
 OBJS = mdriver.o mm.o memlib.o fsecs.o fcyc.o clock.o ftimer.o
 

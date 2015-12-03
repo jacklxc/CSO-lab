@@ -71,7 +71,7 @@ team_t team = {
 
 /* Given block ptr bp, get pointer to next and previous free blocks */
 #define PREV_FREE(bp) (*(void **)(bp))
-#define NEXT_FREE(bp) (*(void **)((bp) + WORD))
+#define NEXT_FREE(bp) (*(void **)((char *)(bp) + WORD))
 
 /* Private global variables - integers, floats, and pointers only */
 static char *heap_start;
@@ -81,8 +81,7 @@ static char *flist_head;
 int mm_init(void);
 void *mm_malloc(size_t size);
 void mm_free(void *ptr);
-void *mm_realloc(void *ptr, size_t size);
-void mm_checkheap(int verbose);
+
 
 /* Helper function prototypes */
 static void *extend_heap(size_t words);
@@ -110,7 +109,7 @@ int mm_init(void) {
     PREV_FREE(flist_head) = NULL;
     // PUT(heap_start + 2*WORD, 0);
     //prologue next pointer
-    PREV_FREE(flist_head) = NULL;
+    NEXT_FREE(flist_head) = NULL;
     // PUT(heap_start + 3*WORD, 0);
     //prologue footer
     PUT(heap_start + 4*WORD, PACK(MIN_BLOCK_SIZE, 1));
@@ -193,7 +192,7 @@ static void *coalesce(void *bp) {
     insert_to_flist(bp);
     return bp;
 }
-
+//Where's the pointers?
 void mm_free(void *ptr) {
     printf("freeing\n");
     //get size of block
@@ -223,6 +222,7 @@ void *mm_malloc(size_t size) {
         bp = extend_heap(extend_size/WORD);
         if (bp != NULL)
             place(bp, adj_size);
+	else printf("bp is still NULL\n");
     }
     return bp;
 }
@@ -300,7 +300,42 @@ void *mm_realloc(void *ptr, size_t size) {
 
 void mm_checkheap(int verbose) {
     printf("checking heap\n");
-    return;
+	//go to the first normal block
+	char *bp=heap_start+4*WORD;
+	while (GET_SIZE(HDRP(bp))!=0){
+		if(!GET_ALLOC(HDRP(bp))){
+			if(!GET_ALLOC(HDRP(NEXT_BLKP(bp)))){
+				printf("There are contiguous free blocks escaped from coalescing.");
+				//return 0;
+			}
+			if(NEXT_FREE(bp)!=NULL){
+				if(GET_ALLOC(HDRP(NEXT_FREE(bp)))){
+					printf("There is an allocated block pointed by NEXT_FREE.");
+					//return 0;
+				}
+			}
+		}
+		bp=NEXT_BLKP(bp);
+	}
+	//obtaining a pointer to a freed block
+	bp=heap_start+4*WORD;
+	while (GET_SIZE(HDRP(bp))!=0){
+		if(!GET_ALLOC(HDRP(bp))){
+			break;
+		}
+		bp=NEXT_BLKP(bp);
+	}
+	//Check if every block in the free list is free.
+	while (!GET_ALLOC(HDRP(bp))){
+		if (PREV_BLKP(bp)!=NULL){
+		bp=NEXT_FREE(bp);
+		}
+	}
+	if (bp!=NULL){
+		printf("There is allocated block in the free list.");
+		//return 0;
+	}
+    return ;
 }
 
 static void insert_to_flist(void *bp) {
