@@ -71,7 +71,6 @@ team_t team = {
 
 /* Private global variables - integers, floats, and pointers only */
 static char *heap_start;
-static char *flist_head;
 
 /* Interface function prototypes */
 int mm_init(void);
