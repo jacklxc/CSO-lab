@@ -117,9 +117,9 @@ team_t team = {
     /* First member's email address */
     "kelvin.liu@nyu.edu",
     /* Second member's full name (leave blank if none) */
-    "",
+    "Xiangci Li",
     /* Second member's email address (leave blank if none) */
-    ""
+    "xl1066@nyu.edu"
 };
 //pointer to the prologue block on the heap
 static void *heap_prologue = NULL;
