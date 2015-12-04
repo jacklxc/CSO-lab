@@ -96,7 +96,7 @@ static void insert_to_flist(void *bp);
 static void remove_block(void *bp);
 
 int mm_init(void) {
-   // printf("initializing heap\n");
+    printf("initializing heap\n");
     //create initial empty heap
     heap_start = (char *)mem_sbrk(3*DWORD);
     if (heap_start == (void *)-1)
@@ -125,7 +125,7 @@ int mm_init(void) {
 }
 
 static void *extend_heap(size_t words) {
-   // printf("extending heap\n");
+    printf("extending heap\n");
     //ensure number of words for the new block is even and meets minimum size
     size_t size = (words % 2 == 0) ? words*WORD : (words + 1)*WORD;
     if (size < MIN_BLOCK_SIZE)
@@ -147,7 +147,7 @@ static void *extend_heap(size_t words) {
 static void *coalesce(void *bp) {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-   // printf("coalescing -- p: %zu | n: %zu\n", prev_alloc, next_alloc);
+    printf("coalescing -- p: %zu | n: %zu\n", prev_alloc, next_alloc);
     size_t size = GET_SIZE(HDRP(bp));
     //previous block is allocated and next block is free
     if (prev_alloc && !next_alloc) {
@@ -209,7 +209,7 @@ void mm_free(void *ptr) {
 }
 
 void *mm_malloc(size_t size) {
-   // printf("mallocing\n");
+    printf("mallocing\n");
     //decline bad parameters
     if (size <= 0)
         return NULL;
@@ -233,7 +233,7 @@ void *mm_malloc(size_t size) {
 }
 
 static void *find_fit(size_t size) {
-   // printf("finding fit\n");
+    printf("finding fit\n");
     //iterate over free list until a block with enough size is found
     for (void *bp = flist_head; GET_ALLOC(HDRP(bp)) == 0; bp = NEXT_FREE(bp))
         if (size <= GET_SIZE(HDRP(bp)))
@@ -243,7 +243,7 @@ static void *find_fit(size_t size) {
 }
 
 static void place(void *bp, size_t size) {
-    //printf("placing\n");
+    printf("placing\n");
     size_t block_size = GET_SIZE(HDRP(bp));
     //if there is enough space in the current block for a new one, split it
     if (block_size - size >= MIN_BLOCK_SIZE) {
@@ -266,7 +266,7 @@ static void place(void *bp, size_t size) {
 }
 
 void *mm_realloc(void *ptr, size_t size) {
-   // printf("reallocing\n");
+    printf("reallocing\n");
     //realloc is equivalent to malloc if ptr is NULL
     if (ptr == NULL)
         return mm_malloc(size);
@@ -338,6 +338,7 @@ void mm_checkheap(int verbose) {
 
 //Print out the information of block bp.
 static void print_block(void *bp){
+	printf("--------------------------------------\n");
 	printf("The address of this block is %p\n",bp);
 	printf("The address of the header is %p\n",HDRP(bp));
 	if(GET_ALLOC(HDRP(bp))){
@@ -349,7 +350,7 @@ static void print_block(void *bp){
 }
 
 static void insert_to_flist(void *bp) {
-   // printf("inserting to flist\n");
+    printf("inserting to flist\n");
     //set the bp's next pointer to the head of the free list
     NEXT_FREE(bp) = flist_head;
     //set the head of the free list's previous pointer to bp
@@ -361,7 +362,7 @@ static void insert_to_flist(void *bp) {
 }
 
 static void remove_block(void *bp) {
-   // printf("removing from flist\n");
+    printf("removing from flist\n");
     if (bp == NULL)
         printf("attemted to remove NULL form flist\n");
     //move the head of the free list to bp's next pointer if bp is the head
