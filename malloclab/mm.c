@@ -104,7 +104,7 @@ static void flist_remove(void *bp);
 static void flist_add(void *bp);
 
 //checkheap functions
-
+//TODO: add prototypes for functions related to checkheap
 
 /* GLOBAL VARIABLES */
 
@@ -256,19 +256,34 @@ void *mm_realloc(void *ptr, size_t size) {
     size_t adj_size = MAX(MIN_BLOCK_SIZE, ALIGN(size + DWORD));
     size_t block_size = GET_SIZE(HDRP(ptr));
     //current block is big enough to fit the given size
-    if (adj_size <= block_size)
-        allocate(ptr, adj_size);
-    //adj_size > block_size, so check if next block is free and big enough
-    else if (!GET_ALLOC(HDRP(NEXT_BLKP(ptr))) &&
-             adj_size <= block_size + GET_SIZE(HDRP(NEXT_BLKP(ptr)))) {
-        //new block size
-        block_size += GET_SIZE(HDRP(NEXT_BLKP(ptr)));
-        //trick allocate function by changing the block's header and footer
-        SET(HDRP(ptr), PACK(block_size, 1));
-        SET(FTRP(ptr), PACK(block_size, 1));
-        allocate(ptr, adj_size);
+    if (adj_size <= block_size) {
+        return ptr;
     }
-    // completely new block must be used
+    //adj_size > block_size, so check if next block is free
+    void *next_blk = NEXT_BLKP(ptr);
+    if (!GET_ALLOC(HDRP(next_blk)) &&
+        adj_size <= block_size + GET_SIZE(HDRP(next_blk))) {
+        //use logic similar to allocate, remove next_blk from the free list
+        flist_remove(next_blk);
+        //increase block size
+        block_size += GET_SIZE(HDRP(next_blk));
+        //check if there's enough room for a free block
+        if (block_size - adj_size >= MIN_BLOCK_SIZE) {
+            //set the size of the current block's header and footer
+            SET(HDRP(ptr), PACK(adj_size, 1));
+            SET(FTRP(ptr), PACK(adj_size, 1));
+            //set the remaining space as a free block
+            SET(HDRP(NEXT_BLKP(ptr)), PACK(block_size - adj_size, 0));
+            SET(FTRP(NEXT_BLKP(ptr)), PACK(block_size - adj_size, 0));
+            coalesce(NEXT_BLKP(ptr));
+        }
+        //simply allocate
+        else {
+            SET(HDRP(ptr), PACK(block_size, 1));
+            SET(FTRP(ptr), PACK(block_size, 1));
+        }
+    }
+    //completely new block must be used
     else {
         //save the original ptr
         void *old_ptr = ptr;
@@ -342,6 +357,8 @@ static void *extend_heap(size_t size) {
  * the difference is created.
  */
 static void allocate(void *bp, size_t size) {
+    //ensure bp is actually free
+    assert(!GET_ALLOC(HDRP(bp)));
     //get the block's actual size
     size_t block_size = GET_SIZE(HDRP(bp));
     //remove the block from the free list
@@ -429,7 +446,7 @@ static void *coalesce(void *bp) {
  */
 static void flist_remove(void *bp) {
     //ensure bp is actually free
-    // assert(!GET_ALLOC(HDRP(bp)));
+    assert(!GET_ALLOC(HDRP(bp)));
     //possible that bp is the head of the list
     if (bp == flist_head)
         flist_head = NEXT_FREE(bp);
@@ -453,3 +470,5 @@ static void flist_add(void *bp) {
     //set bp to the head of the free list
     flist_head = bp;
 }
+
+/* CHECKHEAP FUNCTIONS */
