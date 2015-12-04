@@ -18,6 +18,6 @@ handin:
 	tar czvf lab4.tar.gz Makefile *.c *.h
 
 clean:
-	rm -rf *~ *.o mdriver *.tar.gz *.dSYM
+	rm -rf *~ *.o *.out mdriver *.tar.gz *.dSYM
 
 
