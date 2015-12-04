@@ -94,9 +94,9 @@
 /* FUNCTION PROTOTYPES */
 
 //interface functions
- void *mm_malloc(size_t size); 
- void mm_free(void *ptr);
- void *mm_realloc(void *ptr, size_t size);
+void *mm_malloc(size_t size); 
+void mm_free(void *ptr);
+void *mm_realloc(void *ptr, size_t size);
 
 //helper functions
 static void *find_fit(size_t size);
@@ -475,12 +475,12 @@ static void flist_add(void *bp) {
 
 /*
  * mm_checkheap checks each block in the heap sequencially. The helper function
- * print_block prints the information of each block visited. checkheap checks if there
+ * print_block prints the information of each block visited. mm_checkheap checks if there
  * is any contiguous free block escaped from coalescing by checking each free block's next
- * block and previous block are free or not. checkheap also checks whether each free block 
- *is actually in free list by checking the blocks pointed by PREV_FREE and NEXT_FREE pointers.
+ * block and previous block are free or not. mm_checkheap also checks whether each free block 
+ * is actually in free list by checking the blocks pointed by PREV_FREE and NEXT_FREE pointers.
  * If there is any allocated block pointed by PREV_FREE or NEXT_FREE, there must be an error.
- * Whenever error is detected, checkheap prints out the error type and the address where the 
+ * Whenever error is detected, mm_checkheap prints out the error type and the address where the 
  * error occurs. In case the errors are hidden in too many lines of print out, assert terminates
  * the program when error is detected.
  */
@@ -489,7 +489,8 @@ void mm_checkheap(int verbose) {
     //go to the first normal block
     if(verbose){
         void *bp=heap_prologue;
-        while (bp<mem_heap_hi()){
+	void *last_block=mem_heap_hi()-7;
+        while (bp<last_block){
             //print out the information of block bp.
             print_block(bp);
             if(!GET_ALLOC(HDRP(bp))){
@@ -506,14 +507,14 @@ void mm_checkheap(int verbose) {
                 }
                 //Check if either an allocated block is in the free list
                 // or a freed block is not in the free list.
-                if(NEXT_FREE(bp)!=NULL && NEXT_FREE(bp)<mem_heap_hi()){
+                if(NEXT_FREE(bp)!=NULL && NEXT_FREE(bp)<last_block){
                     if(GET_ALLOC(HDRP(NEXT_FREE(bp)))){
                         printf("There is an allocated block pointed by NEXT_FREE.\n");
                         printf("Error occurs at %p\n",HDRP(NEXT_FREE(bp)));
                         assert(0);
                     }
                 }
-                if(PREV_FREE(bp)!=NULL && PREV_FREE(bp)<mem_heap_hi()){
+                if(PREV_FREE(bp)!=NULL && PREV_FREE(bp)<last_block&&PREV_FREE(bp)>heap_prologue){
                     if(GET_ALLOC(HDRP(PREV_FREE(bp)))){
                         printf("There is an allocated block pointed by PREV_FREE.\n");
                         printf("Error occurs at %p\n",HDRP(PREV_FREE(bp)));
