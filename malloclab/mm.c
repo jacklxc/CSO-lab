@@ -309,7 +309,7 @@ void mm_checkheap(int verbose) {
     printf("checking heap\n");
 	//go to the first normal block
 	if(verbose){
-		void *bp=heap_start+4*WORD;
+		void *bp=heap_start+2*WORD;
 		while (bp<mem_heap_hi()){
 			//print out the information of block bp.
 			print_block(bp);
