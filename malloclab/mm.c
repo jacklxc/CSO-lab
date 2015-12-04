@@ -88,6 +88,8 @@ static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t size);
+static void print_block(void *bp);
+
 
 /* Free list function prototypes */
 static void insert_to_flist(void *bp);
@@ -193,7 +195,7 @@ static void *coalesce(void *bp) {
     insert_to_flist(bp);
     return bp;
 }
-//Where's the pointers?
+
 void mm_free(void *ptr) {
    // printf("freeing\n");
     //get size of block
@@ -226,7 +228,7 @@ void *mm_malloc(size_t size) {
             place(bp, adj_size);
 	//else  printf("bp is still NULL\n");
     }
-	mm_checkheap(0);
+	mm_checkheap(1);
     return bp;
 }
 
@@ -304,22 +306,26 @@ void *mm_realloc(void *ptr, size_t size) {
 }
 
 void mm_checkheap(int verbose) {
-    //printf("checking heap\n");
+    printf("checking heap\n");
 	//go to the first normal block
 	if(verbose){
-		char *bp=heap_start+4*WORD;
-		while (GET_SIZE(HDRP(bp))!=0){
+		void *bp=heap_start+4*WORD;
+		while (bp<mem_heap_hi()){
+			//print out the information of block bp.
+			print_block(bp);
 			if(!GET_ALLOC(HDRP(bp))){
 				//Check if there is any contiguous free block escaped from coalescing.
 				if(!GET_ALLOC(HDRP(NEXT_BLKP(bp)))){
-					printf("There are contiguous free blocks escaped from coalescing.");
+					printf("There are contiguous free blocks escaped from coalescing.\n");
+					printf("Error occurs at %p\n",HDRP(NEXT_BLKP(bp)));
 					assert(0);
 				}
 				//Check if either an allocated block is in the free list
 				// or a freed block is not in the free list.
-				if(NEXT_FREE(bp)!=NULL){
+				if(NEXT_FREE(bp)<mem_heap_hi()){
 					if(GET_ALLOC(HDRP(NEXT_FREE(bp)))){
-						printf("There is an allocated block pointed by NEXT_FREE.");
+						printf("There is an allocated block pointed by NEXT_FREE.\n");
+						printf("Error occurs at %p\n",HDRP(NEXT_FREE(bp)));
 						assert(0);
 					}
 				}
@@ -328,6 +334,18 @@ void mm_checkheap(int verbose) {
 		}
 	}	
     return ;
+}
+
+//Print out the information of block bp.
+static void print_block(void *bp){
+	printf("The address of this block is %p\n",bp);
+	printf("The address of the header is %p\n",HDRP(bp));
+	if(GET_ALLOC(HDRP(bp))){
+		printf("Allocated block\n");
+	}
+	else{printf("Free block\n");}
+		printf("Size: %lu\n",((unsigned long) GET_SIZE(HDRP(bp)))>>4);
+	printf("The address of the footer is %p\n", FTRP(bp));
 }
 
 static void insert_to_flist(void *bp) {
