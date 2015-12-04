@@ -90,3 +90,82 @@
 //get bp's free and next blocks in flist (only if bp is free)
 #define PREV_FREE(bp) (*(void **)(bp))
 #define NEXT_FREE(bp) (*(void **)((char *)(bp) + WORD))
+
+/* FUNCTION PROTOTYPES */
+
+//helper functions
+static void *find_fit(size_t size);
+static void *extend_heap(size_t size);
+static void allocate(void *bp, size_t size);
+static void *coalesce(void *bp);
+
+//linked list functions
+static void flist_remove(void *bp);
+static void flist_add(void *bp);
+
+//checkheap functions
+
+
+/* GLOBAL VARIABLES */
+
+//team information
+team_t team = {
+    /* Team name */
+    "NYU Shanghai #1",
+    /* First member's full name */
+    "Kelvin Liu",
+    /* First member's email address */
+    "kelvin.liu@nyu.edu",
+    /* Second member's full name (leave blank if none) */
+    "",
+    /* Second member's email address (leave blank if none) */
+    ""
+};
+//pointer to the prologue block on the heap
+static void *heap_prologue = NULL;
+//pointer to the head of the free list (flist)
+static void *flist_head = NULL;
+
+/* MALLOC FUNCTIONS*/
+
+/*
+ * mm_init - initializes the malloc package.
+ *
+ * Returns 0 if the initial heap is successfully created, otherwise, -1. Creates
+ * a minimally-sized heap with prologue and epilogue blocks. Does not
+ * extend the heap any more than it needs to. The heap looks something like this
+ * after initialization:
+ *
+ *            /-------------- prologue -------------\
+ * --------------------------------------------------------------
+ * | padding | header | prev_ptr | next_ptr | footer | epilogue |
+ * --------------------------------------------------------------
+ * ||                |||                   |||                 ||
+ *
+ * In the diagram above, the space between single bars (|) is 8 bytes wide. By
+ * extension, double or triple bars (|| or |||) mark the alignment of the heap.
+ * The global variables heap_prologue and flist_head are set to the prologue
+ * block. In the case of flist_head, the prologue block is used as a sentinel,
+ * as it is the only allocated block allowed in the free list.
+ */
+int mm_init(void) {
+    //get initial space for the heap
+    char *heap_start = (char *)mem_sbrk(3*DWORD);
+    //error check
+    if (heap_start == (char *)-1)
+        return -1;
+    //set heap_prologue and flist_head
+    heap_prologue = (void *)(heap_start + DWORD);
+    flist_head = heap_prologue;
+    //beginning padding
+    SET(heap_start, 0);
+    //prologue header and footer
+    SET(HDRP(heap_prologue), PACK(MIN_BLOCK_SIZE, 1));
+    SET(FTRP(heap_prologue), PACK(MIN_BLOCK_SIZE, 1));
+    //prologue pointers
+    PREV_FREE(flist_head) = NULL;
+    NEXT_FREE(flist_head) = NULL;
+    //epilogue
+    SET(HDRP(NEXT_BLKP(heap_prologue)), PACK(0, 1));
+    return 0;
+}
