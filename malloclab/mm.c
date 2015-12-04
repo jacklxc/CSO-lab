@@ -2,7 +2,7 @@
  * mm.c - a dynamic memory allocator based on a single free list
  *
  * This package replaces the functionality of libc's malloc, free, and realloc
- * functions with `mm_malloc`, `m_free`, and `mm_realloc` respectivly. In order
+ * functions with `mm_malloc`, `mm_free`, and `mm_realloc` respectivly. In order
  * to do so, programs must first initialize the program heap by first calling
  * `mm_init`. This dynamic memory allocator features a single free list ordered
  * by a LIFO method. Free blocks are allocated with a first-fit method, and are
@@ -93,6 +93,11 @@
 
 /* FUNCTION PROTOTYPES */
 
+//interface functions
+ void *mm_malloc(size_t size); 
+ void mm_free(void *ptr);
+ void *mm_realloc(void *ptr, size_t size);
+
 //helper functions
 static void *find_fit(size_t size);
 static void *extend_heap(size_t size);
@@ -104,7 +109,8 @@ static void flist_remove(void *bp);
 static void flist_add(void *bp);
 
 //checkheap functions
-//TODO: add prototypes for functions related to checkheap
+void mm_checkheap(int verbose);
+static void print_block(void *bp);
 
 /* GLOBAL VARIABLES */
 
@@ -119,7 +125,7 @@ team_t team = {
     /* Second member's full name (leave blank if none) */
     "Xiangci Li",
     /* Second member's email address (leave blank if none) */
-    "xl1066@nyu.edu"
+ 	"xl1066@nyu.edu"
 };
 //pointer to the prologue block on the heap
 static void *heap_prologue = NULL;
@@ -300,12 +306,6 @@ void *mm_realloc(void *ptr, size_t size) {
     return ptr;
 }
 
-/*
- * mm_checkheap - checks the heap's structural integrity and prints info
- */
-void mm_checkheap(int verbose) {
-    return;
-}
 
 /* HELPER FUNCTIONS */
 
@@ -472,3 +472,72 @@ static void flist_add(void *bp) {
 }
 
 /* CHECKHEAP FUNCTIONS */
+
+/*
+ * mm_checkheap checks each block in the heap sequencially. The helper function
+ * print_block prints the information of each block visited. checkheap checks if there
+ * is any contiguous free block escaped from coalescing by checking each free block's next
+ * block and previous block are free or not. checkheap also checks whether each free block 
+ *is actually in free list by checking the blocks pointed by PREV_FREE and NEXT_FREE pointers.
+ * If there is any allocated block pointed by PREV_FREE or NEXT_FREE, there must be an error.
+ * Whenever error is detected, checkheap prints out the error type and the address where the 
+ * error occurs. In case the errors are hidden in too many lines of print out, assert terminates
+ * the program when error is detected.
+ */
+void mm_checkheap(int verbose) {
+    printf("checking heap\n");
+    //go to the first normal block
+    if(verbose){
+        void *bp=heap_prologue;
+        while (bp<mem_heap_hi()){
+            //print out the information of block bp.
+            print_block(bp);
+            if(!GET_ALLOC(HDRP(bp))){
+                //Check if there is any contiguous free block escaped from coalescing.
+                if(!GET_ALLOC(HDRP(NEXT_BLKP(bp)))){
+                    printf("There are contiguous free blocks escaped from coalescing.\n");
+                    printf("Error occurs at %p\n",HDRP(NEXT_BLKP(bp)));
+                    assert(0);
+                }
+                if(!GET_ALLOC(HDRP(PREV_BLKP(bp)))){
+                    printf("There are contiguous free blocks escaped from coalescing.\n");
+                    printf("Error occurs at %p\n",HDRP(PREV_BLKP(bp)));
+                    assert(0);
+                }
+                //Check if either an allocated block is in the free list
+                // or a freed block is not in the free list.
+                if(NEXT_FREE(bp)!=NULL && NEXT_FREE(bp)<mem_heap_hi()){
+                    if(GET_ALLOC(HDRP(NEXT_FREE(bp)))){
+                        printf("There is an allocated block pointed by NEXT_FREE.\n");
+                        printf("Error occurs at %p\n",HDRP(NEXT_FREE(bp)));
+                        assert(0);
+                    }
+                }
+                if(PREV_FREE(bp)!=NULL && PREV_FREE(bp)<mem_heap_hi()){
+                    if(GET_ALLOC(HDRP(PREV_FREE(bp)))){
+                        printf("There is an allocated block pointed by PREV_FREE.\n");
+                        printf("Error occurs at %p\n",HDRP(PREV_FREE(bp)));
+                        assert(0);
+                    }
+                }
+            }
+            bp=NEXT_BLKP(bp);
+        }
+    }   
+    return ;
+}
+
+/*
+ *print_block prints out the information of block bp.
+ */
+static void print_block(void *bp){
+    printf("--------------------------------------\n");
+    printf("The address of this block is %p\n",bp);
+    printf("The address of the header is %p\n",HDRP(bp));
+    if(GET_ALLOC(HDRP(bp))){
+        printf("Allocated block\n");
+    }
+    else{printf("Free block\n");}
+        printf("Size: %lu\n",((unsigned long) GET_SIZE(HDRP(bp)))>>4);
+    printf("The address of the footer is %p\n", FTRP(bp));
+}
